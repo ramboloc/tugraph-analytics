@@ -22,18 +22,21 @@ import com.antgroup.geaflow.stats.sink.StatsWriterFactory;
 public class StatsCollectorFactory {
 
     private final ExceptionCollector exceptionCollector;
+    private final EventCollector eventCollector;
     private final PipelineStatsCollector pipelineStatsCollector;
     private final ProcessStatsCollector processStatsCollector;
     private final MetricMetaCollector metricMetaCollector;
     private final HeartbeatCollector heartbeatCollector;
     private final MetricCache metricCache;
+    private final IStatsWriter syncWriter;
     private static StatsCollectorFactory INSTANCE;
 
     private StatsCollectorFactory(Configuration configuration) {
-        IStatsWriter statsWriter = StatsWriterFactory.getStatsWriter(configuration);
-        IStatsWriter syncWriter = StatsWriterFactory.getStatsWriter(configuration, true);
-        this.metricCache = new MetricCache(configuration);
+        this.syncWriter = StatsWriterFactory.getStatsWriter(configuration, true);
         this.exceptionCollector = new ExceptionCollector(syncWriter, configuration);
+        this.eventCollector = new EventCollector(syncWriter, configuration);
+        this.metricCache = new MetricCache(configuration);
+        IStatsWriter statsWriter = StatsWriterFactory.getStatsWriter(configuration);
         this.pipelineStatsCollector = new PipelineStatsCollector(statsWriter, configuration, metricCache);
         this.metricMetaCollector = new MetricMetaCollector(statsWriter, configuration);
         this.processStatsCollector = new ProcessStatsCollector(configuration);
@@ -55,6 +58,10 @@ public class StatsCollectorFactory {
         return exceptionCollector;
     }
 
+    public EventCollector getEventCollector() {
+        return eventCollector;
+    }
+
     public PipelineStatsCollector getPipelineStatsCollector() {
         return pipelineStatsCollector;
     }
@@ -73,6 +80,10 @@ public class StatsCollectorFactory {
 
     public MetricCache getMetricCache() {
         return metricCache;
+    }
+
+    public IStatsWriter getStatsWriter() {
+        return syncWriter;
     }
 
 }

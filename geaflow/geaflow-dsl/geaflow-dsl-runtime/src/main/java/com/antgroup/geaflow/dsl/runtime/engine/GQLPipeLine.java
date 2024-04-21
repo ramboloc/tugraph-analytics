@@ -34,6 +34,7 @@ import com.antgroup.geaflow.pipeline.callback.ICallbackFunction;
 import com.antgroup.geaflow.pipeline.callback.TaskCallBack;
 import com.antgroup.geaflow.pipeline.task.IPipelineTaskContext;
 import com.antgroup.geaflow.pipeline.task.PipelineTask;
+import com.antgroup.geaflow.view.IViewDesc.BackendType;
 import com.antgroup.geaflow.view.graph.GraphViewDesc;
 import com.antgroup.geaflow.view.meta.ViewMetaBookKeeper;
 import java.io.IOException;
@@ -64,8 +65,8 @@ public class GQLPipeLine {
         this(environment, -1, parallelismConfigMap);
     }
 
-    public GQLPipeLine(Environment environment, int timeWaitSeconds) {
-        this(environment, timeWaitSeconds, null);
+    public GQLPipeLine(Environment environment, int timeOutSeconds) {
+        this(environment, timeOutSeconds, null);
     }
 
     public GQLPipeLine(Environment environment, int timeWaitSeconds,
@@ -82,7 +83,6 @@ public class GQLPipeLine {
     public void execute() throws Exception {
         Configuration configuration = environment.getEnvironmentContext().getConfig();
         String queryPath = configuration.getString(DSLConfigKeys.GEAFLOW_DSL_QUERY_PATH, GQL_FILE_NAME);
-        LOGGER.info("queryPath:{}", queryPath);
         String script;
         if (queryPath.startsWith(FileConstants.PREFIX_JAVA_RESOURCE)) {
             script = IOUtils.resourceToString(
@@ -92,6 +92,7 @@ public class GQLPipeLine {
             script = IOUtils.resourceToString(queryPath, Charset.defaultCharset(),
                 GQLPipeLine.class.getClassLoader());
         }
+        LOGGER.info("queryPath:{}", queryPath);
 
         if (pipelineHook != null) {
             script = pipelineHook.rewriteScript(script, configuration);
@@ -135,6 +136,9 @@ public class GQLPipeLine {
         public void window(long windowId) {
             if (CheckpointUtil.needDoCheckpoint(windowId, checkpointDuration)) {
                 for (GraphViewDesc graphViewDesc : insertGraphs) {
+                    if (graphViewDesc.getBackend().equals(BackendType.Memory)) {
+                        continue;
+                    }
                     long checkpointId = graphViewDesc.getCheckpoint(windowId);
                     try {
                         ViewMetaBookKeeper keeper = new ViewMetaBookKeeper(graphViewDesc.getName(), conf);

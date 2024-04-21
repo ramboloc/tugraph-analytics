@@ -103,7 +103,7 @@ spec:
   # 作业使用的k8s service account
   serviceAccount: geaflow
   # 作业java进程的主类
-  entryClass: com.antgroup.geaflow.example.graph.dynamic.IncrGraphCompute
+  entryClass: com.antgroup.geaflow.example.graph.statical.compute.khop.KHop
   clientSpec:
     # client pod相关的资源设置
     resource:
@@ -181,7 +181,7 @@ spec:
   # 可选
   udfJars:
     - name: myUdf.jar
-      url: http://localhost:8080/download/myUdf.jar
+      url: http://localhost:8888/download/myUdf.jar
 ```
 
 ### 提交DSL作业
@@ -198,11 +198,11 @@ spec:
   gqlFile:
     # name必须填写正确，否则无法找到对应文件
     name: myGql.gql
-    url: http://localhost:8080/download/myGql.gql
+    url: http://localhost:8888/download/myGql.gql
   # 可选
   udfJars:
     - name: myUdf.jar
-      url: http://localhost:8080/download/myUdf.jar
+      url: http://localhost:8888/download/myUdf.jar
 ```
 关于DSL作业和HLA作业的更多参数，我们在项目目录geaflow-kubernetes-operator/example目录中准备了两个demo作业供大家参考，请分别参考项目中的示例文件：
 * example/example-dsl.yml

@@ -35,7 +35,6 @@ import com.antgroup.geaflow.console.core.model.job.GeaflowJob;
 import com.antgroup.geaflow.console.core.model.job.config.CompileContextClass;
 import com.antgroup.geaflow.console.core.model.plugin.GeaflowPlugin;
 import com.antgroup.geaflow.console.core.model.release.GeaflowRelease;
-import com.antgroup.geaflow.console.core.model.task.GeaflowTask;
 import com.antgroup.geaflow.console.core.model.version.GeaflowVersion;
 import com.antgroup.geaflow.console.core.service.config.DeployConfig;
 import com.antgroup.geaflow.console.core.service.converter.IdConverter;
@@ -114,7 +113,7 @@ public class ReleaseService extends IdService<GeaflowRelease, ReleaseEntity, Rel
         CompilerAndContext compilerAndContext = getCompilerAndContext(version, job.getInstanceId(), CatalogType.MEMORY);
         try {
             return compilerAndContext.getCompiler()
-                .getUnResolvedFunctions(job.generateCode().getText(), compilerAndContext.getContext());
+                .getUnResolvedFunctions(job.getUserCode().getText(), compilerAndContext.getContext());
         } catch (Exception e) {
             throw new GeaflowCompileException("Parse functions failed", e);
         }
@@ -151,20 +150,9 @@ public class ReleaseService extends IdService<GeaflowRelease, ReleaseEntity, Rel
         }
         try {
             return compilerAndContext.getCompiler()
-                .compile(job.generateCode().getText(), compilerAndContext.getContext());
+                .compile(job.getUserCode().getText(), compilerAndContext.getContext());
         } catch (Exception e) {
             throw new GeaflowCompileException("Compile job code failed", e);
-        }
-    }
-
-    public String formatOlapResult(String queryScript, Object resultData, GeaflowTask task) {
-        CompilerAndContext compilerAndContext = getCompilerAndContext(task.getRelease().getVersion(),
-            task.getRelease().getJob().getInstanceId(), CatalogType.CONSOLE);
-        try {
-            return compilerAndContext.getCompiler()
-                .formatOlapResult(queryScript, resultData, compilerAndContext.getContext());
-        } catch (Exception e) {
-            throw new GeaflowCompileException("Format olap result failed", e);
         }
     }
 
@@ -183,7 +171,7 @@ public class ReleaseService extends IdService<GeaflowRelease, ReleaseEntity, Rel
         CompilerAndContext compilerAndContext = getCompilerAndContext(version, job.getInstanceId(), CatalogType.MEMORY);
         try {
             return compilerAndContext.getCompiler()
-                .getDeclaredTablePlugins(job.generateCode().getText(), compilerAndContext.getContext());
+                .getDeclaredTablePlugins(job.getUserCode().getText(), compilerAndContext.getContext());
         } catch (Exception e) {
             throw new GeaflowCompileException("Parse plugins failed", e);
         }
@@ -193,7 +181,7 @@ public class ReleaseService extends IdService<GeaflowRelease, ReleaseEntity, Rel
         CompilerAndContext compilerAndContext = getCompilerAndContext(version, job.getInstanceId(), CatalogType.MEMORY);
         try {
             return compilerAndContext.getCompiler()
-                .getUnResolvedTables(job.generateCode().getText(), compilerAndContext.getContext());
+                .getUnResolvedTables(job.getUserCode().getText(), compilerAndContext.getContext());
         } catch (Exception e) {
             throw new GeaflowCompileException("Parse plugins failed", e);
         }

@@ -38,7 +38,14 @@ import com.antgroup.geaflow.runtime.core.scheduler.cycle.ExecutionGraphCycle;
 import com.antgroup.geaflow.runtime.core.scheduler.cycle.ExecutionNodeCycle;
 import com.antgroup.geaflow.runtime.core.scheduler.cycle.IExecutionCycle;
 import com.antgroup.geaflow.runtime.core.scheduler.io.CycleResultManager;
+import com.antgroup.geaflow.runtime.core.scheduler.io.DataExchanger;
+import com.antgroup.geaflow.runtime.core.scheduler.response.ComputeFinishEventListener;
+import com.antgroup.geaflow.runtime.core.scheduler.response.EventListenerKey;
+import com.antgroup.geaflow.runtime.core.scheduler.response.SourceFinishResponseEventListener;
 import com.antgroup.geaflow.runtime.core.scheduler.result.IExecutionResult;
+import com.antgroup.geaflow.runtime.core.scheduler.statemachine.IScheduleState;
+import com.antgroup.geaflow.runtime.core.scheduler.statemachine.ScheduleState;
+import com.antgroup.geaflow.runtime.core.scheduler.statemachine.graph.GraphStateMachine;
 import com.antgroup.geaflow.runtime.core.scheduler.strategy.IScheduleStrategy;
 import com.antgroup.geaflow.runtime.core.scheduler.strategy.TopologicalOrderScheduleStrategy;
 import com.antgroup.geaflow.shuffle.memory.ShuffleDataManager;
@@ -64,7 +71,6 @@ public class ExecutionGraphCycleScheduler<R> extends AbstractCycleScheduler impl
 
     private static final int SCHEDULE_INTERVAL_MS = 1;
 
-    private GraphCycleEventDispatcher dispatcher;
     private CycleResultManager resultManager;
     private Set<Integer> finishedCycles;
     // Current unfinished clean env event for certain iteration.
@@ -72,27 +78,50 @@ public class ExecutionGraphCycleScheduler<R> extends AbstractCycleScheduler impl
     private long sourceCycleNum;
 
     private long pipelineId;
+    private long schedulerId;
     private String pipelineName;
     private PipelineMetrics pipelineMetrics;
     private List<Object> results;
+    private String cycleLogTag;
+
+    public ExecutionGraphCycleScheduler() {
+    }
+
+    public ExecutionGraphCycleScheduler(long schedulerId) {
+        this.schedulerId = schedulerId;
+    }
 
     @Override
     public void init(ICycleSchedulerContext context) {
         super.init(context);
-        this.dispatcher = new GraphCycleEventDispatcher();
         this.resultManager = context.getResultManager();
         this.finishedCycles = new HashSet<>();
         this.results = new ArrayList<>();
+        this.cycleLogTag = LoggerFormatter.getCycleTag(context.getCycle().getPipelineName(), cycle.getCycleId());
+        this.dispatcher = new SchedulerEventDispatcher(cycleLogTag);
+        registerEventListener();
+        this.stateMachine = new GraphStateMachine();
+        this.stateMachine.init(context);
     }
 
     @Override
+    public void execute(IScheduleState event) {
+        ScheduleState state = (ScheduleState) event;
+        switch (state.getScheduleStateType()) {
+            case EXECUTE_COMPUTE:
+                execute(context.getNextIterationId());
+                break;
+            default:
+                throw new GeaflowRuntimeException(String.format("not support event {}", event));
+        }
+    }
+
     public void execute(long iterationId) {
         IScheduleStrategy scheduleStrategy = new TopologicalOrderScheduleStrategy(context.getConfig());
         scheduleStrategy.init(cycle);
         pipelineId = ExecutionIdGenerator.getInstance().generateId();
         pipelineName = getPipelineName(iterationId);
         this.sourceCycleNum = getSourceCycleNum(cycle);
-        dispatcher.registerListener(cycle.getCycleId(), new ExecutionGraphCycleEventListener());
         LOGGER.info("{} execute iterationId {}, executionId {}", pipelineName, iterationId, pipelineId);
         this.pipelineMetrics = new PipelineMetrics(pipelineName);
         this.pipelineMetrics.setStartTime(System.currentTimeMillis());
@@ -102,15 +131,6 @@ public class ExecutionGraphCycleScheduler<R> extends AbstractCycleScheduler impl
 
             // Get cycle that ready to schedule.
             IExecutionCycle nextCycle = (IExecutionCycle) scheduleStrategy.next();
-            if (nextCycle == null) {
-                try {
-                    Thread.sleep(SCHEDULE_INTERVAL_MS);
-                } catch (InterruptedException e) {
-                    throw new GeaflowRuntimeException(e);
-                }
-                continue;
-            }
-
             ExecutionNodeCycle cycle = (ExecutionNodeCycle) nextCycle;
             cycle.setPipelineName(pipelineName);
             cycle.setPipelineId(pipelineId);
@@ -120,12 +140,14 @@ public class ExecutionGraphCycleScheduler<R> extends AbstractCycleScheduler impl
                 cycle.getCycleHeads().size(), cycle.getCycleTails().size(), cycle.getType());
 
             // Schedule cycle.
-            ICycleScheduler cycleScheduler = CycleSchedulerFactory.create(cycle);
+            PipelineCycleScheduler cycleScheduler =
+                (PipelineCycleScheduler) CycleSchedulerFactory.create(cycle);
             ICycleSchedulerContext cycleContext = CycleSchedulerContextFactory.create(cycle, context);
             cycleScheduler.init(cycleContext);
 
+            EventListenerKey listenerKey = EventListenerKey.of(cycle.getCycleId());
             if (cycleScheduler instanceof IEventListener) {
-                dispatcher.registerListener(cycle.getCycleId(), (IEventListener) cycleScheduler);
+                dispatcher.registerListener(listenerKey, (IEventListener) cycleScheduler);
             }
 
             try {
@@ -143,7 +165,7 @@ public class ExecutionGraphCycleScheduler<R> extends AbstractCycleScheduler impl
                     pipelineName, LoggerFormatter.getCycleName(cycle.getCycleId(), iterationId),
                     System.currentTimeMillis() - start);
                 if (cycleScheduler instanceof IEventListener) {
-                    dispatcher.removeListener(cycle.getCycleId());
+                    dispatcher.removeListener(listenerKey);
                 }
             } catch (Throwable e) {
                 throw new GeaflowRuntimeException(String.format("%s schedule iterationId %s failed ",
@@ -162,9 +184,10 @@ public class ExecutionGraphCycleScheduler<R> extends AbstractCycleScheduler impl
         String cycleLogTag = LoggerFormatter.getCycleTag(pipelineName, cycle.getCycleId(), iterationId);
         // Clean shuffle data for all used workers.
         context.getSchedulerWorkerManager().clean(usedWorkers ->
-            cleanEnv(usedWorkers, cycleLogTag, iterationId, false));
+            cleanEnv(usedWorkers, cycleLogTag, iterationId, false), cycle);
         // Clear last iteration shard meta.
         resultManager.clear();
+        DataExchanger.clear();
         this.pipelineMetrics.setDuration(System.currentTimeMillis() - pipelineMetrics.getStartTime());
         StatsCollectorFactory.getInstance().getPipelineStatsCollector().reportPipelineMetrics(pipelineMetrics);
         LOGGER.info("{} finished {}", cycleLogTag, pipelineMetrics);
@@ -175,25 +198,34 @@ public class ExecutionGraphCycleScheduler<R> extends AbstractCycleScheduler impl
         // Clean shuffle data for all used workers.
         String cycleLogTag = LoggerFormatter.getCycleTag(pipelineName, cycle.getCycleId());
         context.getSchedulerWorkerManager().clean(usedWorkers -> cleanEnv(usedWorkers, cycleLogTag,
-            cycle.getIterationCount(), true));
+            cycle.getIterationCount(), true), cycle);
         return (R) results;
     }
 
-    private void cleanEnv(Set<WorkerInfo> usedWorkers,
+    private void cleanEnv(List<WorkerInfo> usedWorkers,
                           String cycleLogTag,
                           long iterationId,
                           boolean needCleanWorkerContext) {
-        cleanEnvWaitingResponse = new CountDownLatch(usedWorkers.size());
-        LOGGER.info("{} start wait {} clean env response for iteration {}, need clean worker context {}",
-            cycleLogTag, usedWorkers.size(), iterationId, needCleanWorkerContext);
+        CountDownLatch latch = new CountDownLatch(1);
+        LOGGER.info("{} start wait {} clean env response, need clean worker context {}",
+            cycleLogTag, usedWorkers.size(), needCleanWorkerContext);
+        // Register listener to handle response.
+        EventListenerKey listenerKey = EventListenerKey.of(cycle.getCycleId(), EventType.CLEAN_ENV);
+        ComputeFinishEventListener listener =
+            new ComputeFinishEventListener(usedWorkers.size(), events -> {
+                LOGGER.info("{} clean env response {} finished all {} events", cycleLogTag, listenerKey, events.size());
+                latch.countDown();
+            });
+        dispatcher.registerListener(listenerKey, listener);
+
         List<Future<IEvent>> submitFutures = new ArrayList<>(usedWorkers.size());
         for (WorkerInfo worker : usedWorkers) {
             IEvent cleanEvent;
             if (needCleanWorkerContext) {
-                cleanEvent = new CleanEnvEvent(worker.getWorkerIndex(),
+                cleanEvent = new CleanEnvEvent(schedulerId, worker.getWorkerIndex(),
                     cycle.getCycleId(), iterationId, pipelineId, cycle.getDriverId());
             } else {
-                cleanEvent = new CleanStashEnvEvent(worker.getWorkerIndex(),
+                cleanEvent = new CleanStashEnvEvent(schedulerId, worker.getWorkerIndex(),
                     cycle.getCycleId(), iterationId, pipelineId, cycle.getDriverId());
             }
             Future<IEvent> future = RpcClient.getInstance()
@@ -203,7 +235,7 @@ public class ExecutionGraphCycleScheduler<R> extends AbstractCycleScheduler impl
         FutureUtil.wait(submitFutures);
 
         try {
-            cleanEnvWaitingResponse.await();
+            latch.await();
         } catch (InterruptedException e) {
             throw new GeaflowRuntimeException("exception when wait all clean event finish", e);
         } finally {
@@ -221,14 +253,33 @@ public class ExecutionGraphCycleScheduler<R> extends AbstractCycleScheduler impl
 
     @Override
     public void close() {
-        context.close();
+        context.close(cycle);
         LOGGER.info("{} closed", cycle.getPipelineName());
+    }
+
+    public long getSchedulerId() {
+        return schedulerId;
     }
 
     @Override
     public void handleEvent(IEvent event) {
         dispatcher.dispatch(event);
     }
+
+    protected void registerEventListener() {
+        EventListenerKey listenerKey = EventListenerKey.of(context.getCycle().getCycleId(), EventType.LAUNCH_SOURCE);
+        IEventListener listener =
+            new SourceFinishResponseEventListener(getSourceCycleNum(cycle),
+                events -> {
+                    long finishWindowId = ((DoneEvent) events.iterator().next()).getWindowId();
+                    LOGGER.info("{} all source finished at {}", cycleLogTag, finishWindowId);
+                    ((AbstractCycleSchedulerContext) context).setTerminateIterationId(
+                        ((DoneEvent) events.iterator().next()).getWindowId());
+                });
+        // Register listener for end of source event.
+        this.dispatcher.registerListener(listenerKey, listener);
+    }
+
 
     private void cleanInputShuffleData(ExecutionNodeCycle cycle) {
         List<Integer> headVertexIds = cycle.getVertexGroup().getHeadVertexIds();
@@ -245,8 +296,8 @@ public class ExecutionGraphCycleScheduler<R> extends AbstractCycleScheduler impl
         }
     }
 
-    private long getSourceCycleNum(IExecutionCycle cycle) {
-        return ((ExecutionGraphCycle) cycle).getCycleMap().values().stream()
+    private int getSourceCycleNum(IExecutionCycle cycle) {
+        return (int) ((ExecutionGraphCycle) cycle).getCycleMap().values().stream()
             .filter(e -> ((ExecutionNodeCycle) e).getVertexGroup().getParentVertexGroupIds().isEmpty()).count();
     }
 

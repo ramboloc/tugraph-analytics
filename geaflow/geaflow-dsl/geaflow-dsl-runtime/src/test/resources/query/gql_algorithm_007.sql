@@ -53,8 +53,6 @@ SELECT
  src_id, dst_id
 FROM e_source;
 
-CREATE Function khop AS 'com.antgroup.geaflow.dsl.udf.graph.KHop';
-
 INSERT INTO tbl_result(v_id, k_value)
 CALL khop("1",2) YIELD (vid, kValue)
 RETURN vid, kValue

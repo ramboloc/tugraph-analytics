@@ -15,38 +15,51 @@
 package com.antgroup.geaflow.cluster.k8s.failover;
 
 import static com.antgroup.geaflow.cluster.constants.ClusterConstants.DEFAULT_MASTER_ID;
-import static com.antgroup.geaflow.cluster.k8s.config.KubernetesConfigKeys.PROCESS_AUTO_RESTART;
 
 import com.antgroup.geaflow.cluster.clustermanager.ClusterContext;
-import com.antgroup.geaflow.cluster.failover.FailoverStrategyType;
-import com.antgroup.geaflow.cluster.k8s.config.KubernetesConfig.AutoRestartPolicy;
+import com.antgroup.geaflow.cluster.runner.failover.ComponentFailoverStrategy;
 import com.antgroup.geaflow.common.exception.GeaflowHeartbeatException;
+import com.antgroup.geaflow.env.IEnvironment.EnvType;
+import com.antgroup.geaflow.stats.model.EventLabel;
+import com.antgroup.geaflow.stats.model.ExceptionLevel;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-public class KubernetesComponentFailoverStrategy extends AbstractKubernetesFailoverStrategy {
+public class KubernetesComponentFailoverStrategy extends ComponentFailoverStrategy {
     private static final Logger LOGGER =
         LoggerFactory.getLogger(KubernetesComponentFailoverStrategy.class);
 
     protected ClusterContext clusterContext;
 
-    @Override
-    public void init(ClusterContext context) {
-        this.clusterContext = context;
-        context.getConfig().put(PROCESS_AUTO_RESTART, AutoRestartPolicy.UNEXPECTED.getValue());
+    public KubernetesComponentFailoverStrategy() {
+        super(EnvType.K8S);
+    }
+
+    public void init(ClusterContext clusterContext) {
+        super.init(clusterContext);
+        this.clusterContext = clusterContext;
     }
 
     @Override
     public void doFailover(int componentId, Throwable cause) {
         if (componentId != DEFAULT_MASTER_ID) {
             if (cause instanceof GeaflowHeartbeatException) {
+                String startMessage = String.format("Start component failover for component #%s "
+                        + "cause by %s.", componentId, cause.getMessage());
+                LOGGER.info(startMessage);
+                reportFailoverEvent(ExceptionLevel.ERROR, EventLabel.FAILOVER_START, startMessage);
+
                 long startTime = System.currentTimeMillis();
                 if (clusterContext.getDriverIds().containsKey(componentId)) {
-                    clusterManager.recreateDriver(componentId);
+                    clusterManager.restartDriver(componentId);
                 } else {
-                    clusterManager.recreateContainer(componentId);
+                    clusterManager.restartContainer(componentId);
                 }
-                LOGGER.info("Completed failover in {} ms", System.currentTimeMillis() - startTime);
+
+                String finishMessage = String.format("Completed component failover for component "
+                    + "#%s in %s ms.", componentId, System.currentTimeMillis() - startTime);
+                LOGGER.info(finishMessage);
+                reportFailoverEvent(ExceptionLevel.INFO, EventLabel.FAILOVER_FINISH, finishMessage);
             } else {
                 String reason = cause == null ? null : cause.getMessage();
                 LOGGER.warn("{} throws exception: {}", componentId, reason);
@@ -54,8 +67,4 @@ public class KubernetesComponentFailoverStrategy extends AbstractKubernetesFailo
         }
     }
 
-    @Override
-    public FailoverStrategyType getType() {
-        return FailoverStrategyType.component_fo;
-    }
 }

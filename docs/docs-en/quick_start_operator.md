@@ -107,7 +107,7 @@ spec:
   # Kubernetes service account of the job
   serviceAccount: geaflow
   # Java main class of the job
-  entryClass: com.antgroup.geaflow.example.graph.statical.compute.sssp.SSSP
+  entryClass: com.antgroup.geaflow.example.graph.statical.compute.khop.KHop
   clientSpec:
     # Resource params of client pod
     resource:
@@ -185,7 +185,7 @@ spec:
   # Optional
   udfJars:
     - name: myUdf.jar
-      url: http://localhost:8080/download/myUdf.jar
+      url: http://localhost:8888/download/myUdf.jar
 ```
 
 ### Submit DSL job
@@ -202,11 +202,11 @@ spec:
   gqlFile:
     # Name must be correct
     name: myGql.gql
-    url: http://localhost:8080/download/myGql.gql
+    url: http://localhost:8888/download/myGql.gql
   # Optional
   udfJars:
     - name: myUdf.jar
-      url: http://localhost:8080/download/myUdf.jar
+      url: http://localhost:8888/download/myUdf.jar
 ```
 Regarding more parameters of DSL jobs and HLA jobs, we have prepared two demo jobs in the 
 project directory **geaflow-kubernetes-operator/example** directory for your reference. Please 

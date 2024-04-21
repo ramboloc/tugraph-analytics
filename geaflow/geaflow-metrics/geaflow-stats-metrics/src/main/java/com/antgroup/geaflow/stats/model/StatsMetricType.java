@@ -19,6 +19,9 @@ public enum StatsMetricType {
     /** exception log. */
     Exception("_exception_"),
 
+    /** event log. */
+    Event("_event_"),
+
     /** runtime metrics. */
     Metrics("_metrics_"),
 

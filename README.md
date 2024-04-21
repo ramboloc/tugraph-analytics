@@ -11,11 +11,11 @@
 [![EN](https://shields.io/badge/Docs-English-blue?logo=readme)](https://tugraph-analytics.readthedocs.io/en/latest/docs-en/introduction/)
 [![Blog](https://badgen.net/static/Blog/github.io/orange?icon=rss)](https://tugraph-analytics.github.io/)
 
-🌐️ English | [中文](README_cn.md)
+> 🌐️ English | [中文](README_cn.md)
 
 <!--intro-start-->
 ## Introduction
-**TuGraph Analytics**(alias GeaFlow) is an open-source OLAP graph database developed by Ant Group. It supports core capabilities such as trillion-level graph storage, hybrid graph and table processing, real-time graph computation, and interactive graph analysis. Currently, it is widely used in scenarios such as data warehousing acceleration, financial risk control, knowledge graph, and social networks.
+**TuGraph Analytics** (alias: GeaFlow) is the [**fastest**](https://ldbcouncil.org/benchmarks/snb-bi/) open-source OLAP graph database developed by Ant Group. It supports core capabilities such as trillion-level graph storage, hybrid graph and table processing, real-time graph computation, and interactive graph analysis. Currently, it is widely used in scenarios such as data warehousing acceleration, financial risk control, knowledge graph, and social networks.
 
 For more information about GeaFlow: [GeaFlow Introduction](docs/docs-en/introduction.md)
 
@@ -41,7 +41,7 @@ For GeaFlow design paper: [GeaFlow: A Graph Extended and Accelerated Dataflow Sy
 3. Build Project：`mvn clean install -DskipTests`
 4. Test Job：`./bin/gql_submit.sh --gql geaflow/geaflow-examples/gql/loop_detection.sql`
 3. Build Image：`./build.sh --all`
-4. Start Container：`docker run -d --name geaflow-console -p 8080:8080 -p 8888:8888 geaflow-console:0.1`
+4. Start Container：`docker run -d --name geaflow-console -p 8888:8888 geaflow-console:0.1`
 
 For more details：[Quick Start](docs/docs-cn/quick_start.md)。
 
@@ -84,10 +84,24 @@ Thank you very much for contributing to GeaFlow, whether bug reporting, document
 
 For more information: [Contribution](docs/docs-en/contribution.md).
 
+## Partners
+<table cellspacing="0" cellpadding="0">
+  <tr align="center">
+    <td height="80"><a href="https://github.com/CGCL-codes/YiTu"><img src="docs/static/img/partners/hust.png" width="300" alt="HUST" /></a></td>
+    <td height="80"><a href="http://kw.fudan.edu.cn/"><img src="docs/static/img/partners/fu.png" width="300" alt="FU" /></a></td>
+    <td height="80"><img src="docs/static/img/partners/zju.png" width="300" alt="ZJU" /></td>
+  </tr>
+  <tr align="center">
+    <td height="80"><a href="http://www.whaleops.com/"><img src="docs/static/img/partners/whaleops.png" width="300" alt="WhaleOps" /></a></td>
+    <td height="80"><a href="https://github.com/oceanbase/oceanbase"><img src="docs/static/img/partners/oceanbase.png" width="300" alt="OceanBase" /></a></td>
+    <td height="80"><a href="https://github.com/secretflow/secretflow"><img src="docs/static/img/partners/secretflow.png" width="300" alt="SecretFlow" /></a></td>
+  </tr>
+</table>
+
 ## Contact Us
 You can contact us through the following methods:
 
-![contacts](docs/static/img/contacts.jpg)
+![contacts](docs/static/img/contacts-en.png)
 
 **If you are interested in GeaFlow, please give our project a [ ⭐️ ](https://github.com/TuGraph-family/tugraph-analytics).**
 

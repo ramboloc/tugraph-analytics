@@ -92,8 +92,9 @@ public class GeaflowTaskOperator {
     public boolean start(GeaflowTask task) {
         GeaflowRuntime runtime = runtimeFactory.getRuntime(task);
 
-        // generate task token
+        // generate task token and save before start
         task.setToken(tokenGenerator.nextTaskToken());
+        taskService.update(task);
 
         // submit job to the engine
         try {
@@ -160,8 +161,8 @@ public class GeaflowTaskOperator {
 
     public boolean cleanData(GeaflowTask task) {
         GeaflowPluginConfig dataConfig = task.getDataPluginConfig();
-        GeaflowDataStore dataStore = dataStoreFactory.getDataStore(dataConfig);
-        dataStore.cleanData(task);
+        GeaflowDataStore dataStore = dataStoreFactory.getDataStore(dataConfig.getType());
+        dataStore.cleanTaskData(task);
         return true;
     }
 

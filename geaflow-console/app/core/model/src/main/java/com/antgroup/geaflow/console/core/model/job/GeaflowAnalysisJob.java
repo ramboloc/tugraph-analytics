@@ -15,21 +15,11 @@
 package com.antgroup.geaflow.console.core.model.job;
 
 import com.antgroup.geaflow.console.common.util.type.GeaflowJobType;
-import com.antgroup.geaflow.console.core.model.code.GeaflowCode;
 
 public abstract class GeaflowAnalysisJob extends GeaflowApiJob {
 
     public GeaflowAnalysisJob(GeaflowJobType type) {
         super(type);
     }
-
-    @Override
-    public GeaflowCode generateCode() {
-        return null;
-    }
-
-    @Override
-    public GeaflowCode getUserCode() {
-        return null;
-    }
+    
 }

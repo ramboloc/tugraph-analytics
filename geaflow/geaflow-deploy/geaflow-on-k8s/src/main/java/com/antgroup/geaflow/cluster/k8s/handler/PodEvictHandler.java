@@ -16,17 +16,18 @@ package com.antgroup.geaflow.cluster.k8s.handler;
 
 import static com.antgroup.geaflow.cluster.k8s.config.KubernetesConfigKeys.EVICTED_POD_LABELS;
 
+import com.antgroup.geaflow.cluster.k8s.handler.PodHandlerRegistry.EventKind;
 import com.antgroup.geaflow.cluster.k8s.utils.KubernetesUtils;
 import com.antgroup.geaflow.common.config.Configuration;
+import com.antgroup.geaflow.stats.model.ExceptionLevel;
 import io.fabric8.kubernetes.api.model.Pod;
 import java.util.Map;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-public class PodEvictHandler implements IPodEventHandler {
+public class PodEvictHandler extends AbstractPodHandler {
 
     private static final Logger LOG = LoggerFactory.getLogger(PodEvictHandler.class);
-
     private final Map<String, String> evictLabels;
     private int totalCount;
 
@@ -37,16 +38,20 @@ public class PodEvictHandler implements IPodEventHandler {
     @Override
     public void handle(Pod pod) {
         Map<String, String> labels = pod.getMetadata().getLabels();
-        for (String key : evictLabels.keySet()) {
-            if (labels.get(key) != null && labels.get(key).equalsIgnoreCase(evictLabels.get(key))) {
+        for (Map.Entry<String, String> entry : evictLabels.entrySet()) {
+            String key = entry.getKey();
+            if (labels.get(key) != null && labels.get(key).equalsIgnoreCase(entry.getValue())) {
                 String componentId = KubernetesUtils.extractComponentId(pod);
-                if (componentId != null) {
-                    LOG.info("Pod #{} {} will be removed, label: {} annotations: {}, total "
-                            + "removed: {}", componentId,
-                        pod.getMetadata().getName(), key, pod.getMetadata().getAnnotations(),
-                        totalCount++);
-                    break;
-                }
+                String message = String.format(
+                    "Pod #%s %s will be removed, label: %s annotations: %s, total removed: %s",
+                    componentId, pod.getMetadata().getName(), key,
+                    pod.getMetadata().getAnnotations(), ++totalCount);
+                LOG.info(message);
+
+                PodEvent event = new PodEvent(pod, EventKind.POD_EVICTION);
+                notifyListeners(event);
+                reportPodEvent(event, ExceptionLevel.WARN, message);
+                break;
             }
         }
     }
